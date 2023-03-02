@@ -1,0 +1,213 @@
+##pre install for ubunto
+
+sudo apt install tree
+
+sudo apt-get update
+lsb_release -a
+
+sudo apt update
+sudo apt install default-jdk
+
+
+#kafka install
+cd /usr/local
+
+wget https://downloads.apache.org/kafka/2.8.2/kafka_2.13-2.8.2.tgz    
+tar zxf kafka_2.13-2.8.2.tgz    
+ln -s kafka_2.13-2.8.2 kafka
+ls -al kafka 
+// 심볼릭 링크 확인
+
+
+#kafka directory 생성
+mkdir -p data1
+mkdir -p data2
+
+
+-----------------------------------------------------------------------
+#zookeeper setting
+vi zookeeper.properties
+
+tickTime=2000
+initLimit=10
+syncLimit=5
+dataDir=/home/ubuntu/data1
+
+clientPort=2181
+
+server.1=kafka1.example.org:2888:3888
+server.2=kafka2.example.org:2888:3888
+server.3=kafka3.example.org:2888:3888
+
+-----------------------------------------------------------------------
+data1 경로에서 vi myid 
+id값 부여
+-----------------------------------------------------------------------
+
+#카프카 환경설정(server.properties)
+cd kafka/config
+
+vi server.properties
+
+broker.id=1 부분 수정(cluster naming)
+
+log.dir : 로그가 저장되는 위치다. 조금 전 생성했던 카프카 저장 디렉토리인 /data1, /data2를 입력해준다.
+
+zookeeper.connect=localhost:2181
+
+kafka01서버 : 
+zookeeper.connect=zk01:2181,zk02:2181,zk03:2181/kafka01_znode
+
+zookeeper.connect=kafka1:2181,kafka2:2181/kafka1_znode
+
+kafka02서버 : 
+zookeeper.connect=kafka1:2181,kafka2:2181/kafka2_znode
+
+zookeeper.connect=172.25.14.139:2181,172.25.12.217:2181/kafka1_znode
+zookeeper.connect=172.25.14.139:2181,172.25.12.217:2181/kafka2_znode
+
+
+advertised.listeners=PLAINTEXT://172.25.14.139:9092
+advertised.listeners=PLAINTEXT://172.25.12.217:9092
+
+-----------------------------------------------------------------------
+#서버 정보
+
+172.25.14.139 - kafka1
+172.25.12.217 - kafka2
+172.25.7.26   - kafka3
+
+
+log.dirs=/home/ubuntu/data1
+
+dataDir=/home/ubuntu/data1
+
+allow.auto.create.topics=false
+
+zookeeper.connect=172.25.14.139:2181,172.25.12.217:2181,172.25.7.26:2181
+
+
+-----------------------------------------------------------------------
+#kafka 실행
+
+
+#./bin/zkServer.sh start
+
+./bin/zookeeper-server-start.sh -daemon config/zookeeper.properties
+./bin/kafka-server-start.sh -daemon config/server.properties
+
+#확인
+jps 
+(QuorumPeerMain = zookeeper, Kafka)
+
+#stop
+./bin/zookeeper-server-stop.sh config/zookeeper.properties
+./bin/kafka-server-stop.sh config/server.properties
+
+#topic 생성
+./bin/kafka-topics.sh --create --zookeeper 172.25.14.139:2181, 172.25.12.217:2181, 172.25.7.26:2181 --replication-factor 3 --partitions 1 --topic seatLocked
+
+
+///////////./bin/kafka-topics.sh --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 3 --topic seatCreated
+
+
+#topic 리스트 확인
+./bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
+./bin/kafka-topics.sh --list --zookeeper 172.25.14.139:2181, 172.25.12.217:2181, 172.25.7.26:2181
+
+//////./bin/kafka-topics.sh --list --zookeeper 172.25.14.139:2181, 172.25.12.217:2181
+
+#topic 상세
+./bin/kafka-topics.sh --zookeeper 172.25.14.139:2181, 172.25.12.217:2181, 172.25.7.26:2181 \--topic seatLocked --describe
+
+///./bin/kafka-topics.sh --bootstrap-server localhost:9092 \--topic seatLocked --describe
+
+#topic 삭제
+delete.topic.enable = true
+////./bin/kafka-topics.sh --delete --bootstrap-server localhost:9092 --topic seatCreated
+
+
+./bin/kafka-topics.sh --delete --zookeeper 172.25.14.139:2181, 172.25.12.217:2181, 172.25.7.26:2181 --topic seatLocked
+
+#삭제 안될시
+log data 삭제(data1, data2, logs)
+실행중인상태에서
+
+./bin/zookeeper-shell.sh localhost:2181
+ls /brokers/topics 
+토픽이름 토픽2 토픽3
+rmr /brokers/topics/토픽이름
+deleteall /brokers/topics/토픽이름
+exist
+$ kafka-topics --create --zookeeper localhost:2181 --topic 토픽이름 
+success create topic
+
+-----------------------------------------------------------------------
+netstat -ntlp | grep 9092
+#ip address 확인
+hostname -I
+172.25.12.217
+
+sudo apt install net-tools
+ifconfig
+
+ip addr
+
+-----------------------------------------------------------------------
+
+##install
+
+kafka1
+kafka2
+
+hostname
+hostnamectl set-hostname kafka1
+
+
+sudo passwd root
+su
+
+sudo add-apt-repository main
+sudo add-apt-repository universe
+sudo add-apt-repository restricted
+sudo add-apt-repository multiverse
+
+sudo apt-get install yum
+
+-java
+yum -y install java-1.8.0-openjdk.x86_64
+
+
+
+
+
+
+
+
+-----------------------------------------------------------------------------------------------
+#토픽 생성 된후 describe 옵션을 이용해서 토픽에 대한 상세한 정보를 출력
+kafka-topics.sh --bootstrap-server kafka1:9092 \--topic jade-test01 --describe
+
+
+
+#프로듀서를 이용해서 테스트 메세지를 jade-test01 토픽으로 전송
+$ kafka-console-producer.sh --bootstrap-server \kafka1:9092 --topic jade-test01
+
+#세그먼트를 확인
+kafka-dump-log.sh
+:$ kafka-dump-log.sh --print-data-log \--files /usr/local/kafka/logs/jade-test01-0/00000000000000000000.log
+
+#ISR(In Sync Replica) 상태 확인
+$ kafka-topics.sh --bootstrap-server kafka1:9092 \--topic jade-test01 --describe
+
+
+
+-----------------------------------------------------------------------------------------------
+Cluster 구성 
+
+
+
+
+
+
+
